@@ -1,22 +1,24 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 import type { ErrorCode, PlanInput, TripPlan } from './types';
-import { validateInput } from './validate';
+import { generateDemoPlan } from './demo';
+import { dayCount, MIN_PER_DAY, validateInput } from './validate';
+
 export type PlanState =
-  | { status: 'idle' }
-  | { status: 'invalid'; errors: Record<string, string | undefined> }
-  | { status: 'loading'; input: PlanInput }
-  | { status: 'success'; input: PlanInput; plan: TripPlan }
-  | { status: 'empty'; code: 'BUDGET_TOO_LOW' | 'CITY_NOT_SUPPORTED'; minBudget?: number; input: PlanInput }
-  | { status: 'error'; code: ErrorCode; retryable: boolean; input: PlanInput };
+    | { status: 'idle' }
+    | { status: 'invalid'; errors: Record<string, string | undefined> }
+    | { status: 'loading'; input: PlanInput }
+    | { status: 'success'; input: PlanInput; plan: TripPlan }
+    | { status: 'empty'; code: 'BUDGET_TOO_LOW' | 'CITY_NOT_SUPPORTED'; minBudget?: number; input: PlanInput }
+    | { status: 'error'; code: ErrorCode; retryable: boolean; input: PlanInput };
 
 type Action =
-  | { type: 'submit'; input: PlanInput }
-  | { type: 'invalid'; errors: Record<string, string | undefined> }
-  | { type: 'ok'; input: PlanInput; plan: TripPlan }
-  | { type: 'fail'; input: PlanInput; code: ErrorCode; minBudget?: number }
-  | { type: 'reset' };
+    | { type: 'submit'; input: PlanInput }
+    | { type: 'invalid'; errors: Record<string, string | undefined> }
+    | { type: 'ok'; input: PlanInput; plan: TripPlan }
+    | { type: 'fail'; input: PlanInput; code: ErrorCode; minBudget?: number }
+    | { type: 'reset' };
 
 function reducer(state: PlanState, action: Action): PlanState {
   switch (action.type) {
@@ -48,9 +50,6 @@ const PlanContext = createContext<PlanContextValue | null>(null);
 
 export function PlanProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { status: 'idle' } as PlanState);
-  const controller = useRef<AbortController | null>(null);
-
-  useEffect(() => () => controller.current?.abort(), []);
 
   const submit = useCallback(async (raw: unknown) => {
     const v = validateInput(raw);
@@ -58,25 +57,16 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'invalid', errors: v.errors });
       return;
     }
-    controller.current?.abort();
-    const c = new AbortController();
-    controller.current = c;
     dispatch({ type: 'submit', input: v.input });
 
-    try {
-      const res = await fetch('/api/plan', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(v.input),
-        signal: c.signal,
-      });
-      const data: { plan?: TripPlan; code?: ErrorCode; minBudget?: number } = await res.json();
-      if (res.ok && data.plan) dispatch({ type: 'ok', input: v.input, plan: data.plan });
-      else dispatch({ type: 'fail', input: v.input, code: data.code ?? 'UNKNOWN', minBudget: data.minBudget });
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      dispatch({ type: 'fail', input: v.input, code: 'NETWORK' });
+    await new Promise((r) => setTimeout(r, 900));
+
+    const minBudget = dayCount(v.input.startDate, v.input.endDate) * MIN_PER_DAY;
+    if (v.input.budget < minBudget) {
+      dispatch({ type: 'fail', input: v.input, code: 'BUDGET_TOO_LOW', minBudget });
+      return;
     }
+    dispatch({ type: 'ok', input: v.input, plan: generateDemoPlan(v.input) });
   }, []);
 
   const reset = useCallback(() => dispatch({ type: 'reset' }), []);

@@ -1,5 +1,11 @@
+const isPages = process.env.GITHUB_PAGES === 'true';
+
 const nextConfig = {
   reactStrictMode: true,
-  images: { formats: ['image/avif', 'image/webp'] },
+  output: 'export',
+  trailingSlash: true,
+  basePath: isPages ? '/aurora' : '',
+  images: { unoptimized: true },
 };
+
 export default nextConfig;
