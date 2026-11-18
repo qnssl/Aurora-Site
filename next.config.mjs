@@ -4,7 +4,7 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'export',
   trailingSlash: true,
-  basePath: isPages ? '/aurora' : '',
+  basePath: isPages ? '/Aurora-Site' : '',
   images: { unoptimized: true },
 };
 
