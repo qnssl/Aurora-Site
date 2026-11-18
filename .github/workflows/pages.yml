@@ -1,66 +1,43 @@
-'use client';
-import { motion, type MotionValue } from 'framer-motion';
-import type { Stop } from '@/lib/planner/types';
+name: Deploy to GitHub Pages
 
-const W = 600;
-const H = 420;
-const P = 56;
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
 
-export function project(points: { lat: number; lng: number }[]) {
-  const lats = points.map((p) => p.lat);
-  const lngs = points.map((p) => p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const rLat = Math.max(maxLat - minLat, 0.01);
-  const rLng = Math.max(maxLng - minLng, 0.01);
-  return points.map((p) => ({
-    x: P + ((p.lng - minLng) / rLng) * (W - 2 * P),
-    y: P + ((maxLat - p.lat) / rLat) * (H - 2 * P),
-  }));
-}
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-export function RouteMap({ stops, progress }: { stops: Stop[]; progress?: MotionValue<number> }) {
-  const pts = project(stops);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Маршрут: ${stops.map((s) => s.name).join(', ')}`} className="h-auto w-full">
-      <defs>
-        <linearGradient id="route-grad" x1="0" x2="1">
-          <stop offset="0" style={{ stopColor: 'rgb(var(--accent-rgb))' }} />
-          <stop offset="1" style={{ stopColor: 'rgb(var(--accent-3-rgb))' }} />
-        </linearGradient>
-      </defs>
-      <path d={d} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth={10} strokeLinecap="round" />
-      {progress ? (
-        <motion.path
-          d={d}
-          fill="none"
-          stroke="url(#route-grad)"
-          strokeWidth={3}
-          strokeLinecap="round"
-          style={{ pathLength: progress }}
-        />
-      ) : (
-        <motion.path
-          d={d}
-          fill="none"
-          stroke="url(#route-grad)"
-          strokeWidth={3}
-          strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        />
-      )}
-      {pts.map((p, i) => (
-        <g key={`${stops[i].name}-${i}`}>
-          <circle cx={p.x} cy={p.y} r={6} style={{ fill: 'rgb(var(--fg-rgb))' }} />
-          <text x={p.x + 12} y={p.y + 4} fontSize="13" style={{ fill: 'rgb(var(--muted-rgb))' }}>
-            {i + 1}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_REPO_URL: https://github.com/qnssl/Aurora-Site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
