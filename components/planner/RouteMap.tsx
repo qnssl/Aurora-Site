@@ -22,9 +22,6 @@ export function project(points: { lat: number; lng: number }[]) {
 export function RouteMap({ stops, progress }: { stops: Stop[]; progress?: MotionValue<number> }) {
   const pts = project(stops);
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const drawProps = progress
-    ? { pathLength: progress }
-    : { initial: { pathLength: 0 }, animate: { pathLength: 1 } };
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Маршрут: ${stops.map((s) => s.name).join(', ')}`} className="h-auto w-full">
@@ -35,15 +32,27 @@ export function RouteMap({ stops, progress }: { stops: Stop[]; progress?: Motion
         </linearGradient>
       </defs>
       <path d={d} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth={10} strokeLinecap="round" />
-      <motion.path
-        d={d}
-        fill="none"
-        stroke="url(#route-grad)"
-        strokeWidth={3}
-        strokeLinecap="round"
-        transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        {...drawProps}
-      />
+      {progress ? (
+        <motion.path
+          d={d}
+          fill="none"
+          stroke="url(#route-grad)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          style={{ pathLength: progress }}
+        />
+      ) : (
+        <motion.path
+          d={d}
+          fill="none"
+          stroke="url(#route-grad)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        />
+      )}
       {pts.map((p, i) => (
         <g key={`${stops[i].name}-${i}`}>
           <circle cx={p.x} cy={p.y} r={6} style={{ fill: 'rgb(var(--fg-rgb))' }} />
