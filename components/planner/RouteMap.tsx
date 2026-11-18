@@ -1,5 +1,6 @@
 'use client';
-import { motion, type MotionValue } from 'framer-motion';
+import { useEffect } from 'react';
+import { animate, motion, useMotionValue, type MotionValue } from 'framer-motion';
 import type { Stop } from '@/lib/planner/types';
 
 const W = 600;
@@ -23,6 +24,14 @@ export function RouteMap({ stops, progress }: { stops: Stop[]; progress?: Motion
   const pts = project(stops);
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 
+  // Без внешнего progress линия рисуется один раз при появлении.
+  const own = useMotionValue(0);
+  useEffect(() => {
+    if (progress) return;
+    const controls = animate(own, 1, { duration: 1.2, ease: [0.16, 1, 0.3, 1] });
+    return () => controls.stop();
+  }, [progress, own]);
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Маршрут: ${stops.map((s) => s.name).join(', ')}`} className="h-auto w-full">
       <defs>
@@ -32,27 +41,14 @@ export function RouteMap({ stops, progress }: { stops: Stop[]; progress?: Motion
         </linearGradient>
       </defs>
       <path d={d} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth={10} strokeLinecap="round" />
-      {progress ? (
-        <motion.path
-          d={d}
-          fill="none"
-          stroke="url(#route-grad)"
-          strokeWidth={3}
-          strokeLinecap="round"
-          style={{ pathLength: progress }}
-        />
-      ) : (
-        <motion.path
-          d={d}
-          fill="none"
-          stroke="url(#route-grad)"
-          strokeWidth={3}
-          strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        />
-      )}
+      <motion.path
+        d={d}
+        fill="none"
+        stroke="url(#route-grad)"
+        strokeWidth={3}
+        strokeLinecap="round"
+        style={{ pathLength: progress ?? own }}
+      />
       {pts.map((p, i) => (
         <g key={`${stops[i].name}-${i}`}>
           <circle cx={p.x} cy={p.y} r={6} style={{ fill: 'rgb(var(--fg-rgb))' }} />
